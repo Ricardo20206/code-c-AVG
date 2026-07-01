@@ -18,8 +18,8 @@
 #define CURRENT_RESOLUTION_A 0.1f
 
 // --- Sondes NTC PCB (diviseur résistif + filtrage condensateur) ---
-#define NTC_PCB1_ADC_PIN    34
-#define NTC_PCB2_ADC_PIN    35
+#define NTC_PCB1_ADC_PIN    26
+#define NTC_PCB2_ADC_PIN    25
 #define NTC_SERIES_RES_OHM  10000.0f
 #define NTC_BETA            3950.0f
 #define NTC_NOMINAL_OHM     10000.0f
@@ -34,7 +34,7 @@
 #define PWR_DETECT_HT_PIN   25
 
 // --- Indicateurs locaux ---
-#define LED_GREEN_PIN       2
+#define LED_GREEN_PIN       14
 #define LED_RED_PIN         15
 #define BUZZER_PIN          13
 #define BUZZER_PWM_CHANNEL  0

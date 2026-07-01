@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <esp32-hal-psram.h>
 #include <esp_heap_caps.h>
 
 #include "alarm_manager.h"
@@ -91,12 +92,21 @@ static void persistMeasurement() {
 void setup() {
     Serial.begin(115200);
     delay(500);
-    Serial.println("Ventec AGV Monitor v1.1 - demarrage");
+    Serial.println("Ventec AGV Monitor v1.2 - demarrage");
+
+    if (psramFound()) {
+        Serial.printf("PSRAM detectee : %u Ko\n", ESP.getPsramSize() / 1024);
+    } else {
+        Serial.println("ATTENTION: PSRAM non detectee (verifier board_build.psram et module WROVER)");
+    }
 
     s_psramAlarms = (AlarmRecord*)heap_caps_malloc(
         PSRAM_ALARM_MAX * sizeof(AlarmRecord), MALLOC_CAP_SPIRAM);
-    if (!s_psramAlarms) {
+    if (s_psramAlarms) {
+        Serial.println("Tampon alarmes : PSRAM");
+    } else {
         s_psramAlarms = (AlarmRecord*)malloc(PSRAM_ALARM_MAX * sizeof(AlarmRecord));
+        Serial.println("Tampon alarmes : RAM interne (fallback)");
     }
 
     g_time.begin();

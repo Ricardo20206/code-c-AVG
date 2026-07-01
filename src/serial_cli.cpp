@@ -5,12 +5,39 @@
 #include "current_sensor.h"
 #include "data_logger.h"
 #include "i2c_manager.h"
+#include "indicators.h"
 #include "lab_test.h"
 #include "power_monitor.h"
 #include <Arduino.h>
 #include <Wire.h>
 
 SerialCli g_cli;
+
+static String s_cmdBuffer;
+
+static String normalizeCommand(String s) {
+    s.trim();
+    s.toUpperCase();
+    return s;
+}
+
+// Lit une ligne complète (gère \r, \n, caractères parasites Windows)
+static bool pollCommandLine(String& out) {
+    while (Serial.available()) {
+        char c = Serial.read();
+        if (c == '\n' || c == '\r') {
+            if (s_cmdBuffer.length() == 0) continue;
+            out = normalizeCommand(s_cmdBuffer);
+            s_cmdBuffer = "";
+            return true;
+        }
+        if (c >= 32 && c <= 126) {
+            s_cmdBuffer += c;
+            if (s_cmdBuffer.length() > 64) s_cmdBuffer = "";
+        }
+    }
+    return false;
+}
 
 static void printHelp() {
     Serial.println("--- Commandes Ventec AGV Monitor ---");
@@ -29,6 +56,11 @@ static void printHelp() {
     Serial.println("  THRESH <w> <a> <t>  Modifier seuils (A, A, °C)");
     Serial.println("  GPIO            Etat broches detection alimentation");
     Serial.println("  STORAGE         Statistiques stockage (Jalon 1)");
+    Serial.println("  BUZZER          Bip test (GPIO " + String(BUZZER_PIN) + ")");
+    Serial.println("  BUZZER WARN     Motif sonore avertissement");
+    Serial.println("  BUZZER ALARM    Motif sonore alarme critique");
+    Serial.println("  BUZZER <Hz> <ms>  Bip personnalise (ex: BUZZER 2500 300)");
+    Serial.println("  VERSION         Version firmware");
     Serial.println("  HELP            Cette aide");
 }
 
@@ -64,15 +96,9 @@ static void printStorageStats() {
 }
 
 void SerialCli::process(const LiveData& live) {
-    if (!Serial.available()) return;
-
-    String line = Serial.readStringUntil('\n');
-    line.trim();
-
-    if (line.length() == 0) return;
-
-  String cmd = line;
-  cmd.toUpperCase();
+    String cmd;
+    if (!pollCommandLine(cmd)) return;
+    if (cmd.length() == 0) return;
 
   if (cmd == "EXPORT" || cmd == "LOGS") {
     Serial.println(g_logger.exportAllCsv());
@@ -148,7 +174,31 @@ void SerialCli::process(const LiveData& live) {
                   digitalRead(PWR_DETECT_HT_PIN));
   } else if (cmd == "STORAGE") {
     printStorageStats();
+  } else if (cmd == "VERSION") {
+    Serial.println("Ventec AGV Monitor v1.2");
+  } else if (cmd == "BUZZER") {
+    g_indicators.playTone(BUZZER_PWM_FREQ, 500);
+    Serial.printf("OK: bip %u Hz, 500 ms (GPIO %d)\n", BUZZER_PWM_FREQ, BUZZER_PIN);
+  } else if (cmd == "BUZZER WARN") {
+    g_indicators.playPattern(AlarmLevel::WARNING);
+    Serial.println("OK: motif warning (2 bips 1500 Hz)");
+  } else if (cmd == "BUZZER ALARM" || cmd == "BUZZER CRIT") {
+    g_indicators.playPattern(AlarmLevel::CRITICAL);
+    Serial.println("OK: motif critique (3 bips 2500 Hz)");
+  } else if (cmd.startsWith("BUZZER ")) {
+    int sp = cmd.indexOf(' ', 7);
+    if (sp > 0) {
+      uint16_t freq = cmd.substring(7, sp).toInt();
+      uint16_t ms   = cmd.substring(sp + 1).toInt();
+      if (freq < 100) freq = BUZZER_PWM_FREQ;
+      if (ms < 50) ms = 200;
+      g_indicators.playTone(freq, ms);
+      Serial.printf("OK: bip %u Hz, %u ms\n", freq, ms);
+    } else {
+      Serial.println("Usage: BUZZER <freq_Hz> <duree_ms>");
+    }
   } else {
-    Serial.println("Commande inconnue. Tapez HELP.");
+    Serial.printf("Commande inconnue: [%s] (len=%u). Tapez HELP ou VERSION.\n",
+                  cmd.c_str(), cmd.length());
   }
 }
