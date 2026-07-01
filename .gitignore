@@ -1,0 +1,27 @@
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Build / cache
+*.o
+*.a
+*.elf
+*.bin
+*.map
+
+# IDE
+.vscode/.browse.c_cpp.db*
+.vscode/launch.json
+.vscode/ipch/
+.idea/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Secrets (ne jamais versionner)
+.env
+*.pem
+credentials.json
