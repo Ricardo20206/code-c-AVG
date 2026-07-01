@@ -2,6 +2,8 @@
 
 #include "types.h"
 
+bool begin();
+
 // Mode laboratoire (EXF-10) — validation sans AGV connecté
 class LabTest {
 public:

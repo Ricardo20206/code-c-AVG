@@ -9,7 +9,37 @@ bool PowerMonitor::begin() {
     pinMode(PWR_DETECT_BT_PIN, INPUT);
     pinMode(PWR_DETECT_HT_PIN, INPUT);
     _lastSource = readSource();
+    update();
     return true;
+}
+
+void PowerMonitor::update() {
+    const PowerSource source = readSource();
+    switch (source) {
+        case PowerSource::USB_C:
+            _batteryVoltage = 5.0f;
+            _batteryPercent = 100.0f;
+            break;
+        case PowerSource::BT_SVC:
+            _batteryVoltage = 12.0f;
+            _batteryPercent = 80.0f;
+            break;
+        case PowerSource::HT_36V:
+        default:
+            _batteryVoltage = 36.0f;
+            _batteryPercent = 92.0f;
+            break;
+    }
+}
+
+float PowerMonitor::readBatteryPercent() {
+    update();
+    return _batteryPercent;
+}
+
+float PowerMonitor::readBatteryVoltage() {
+    update();
+    return _batteryVoltage;
 }
 
 PowerSource PowerMonitor::readSource() const {
