@@ -73,4 +73,5 @@ struct LiveData {
     bool          vibration_present;
     bool          humidity_present;
     bool          lora_present;
+    bool          lab_active;
 };

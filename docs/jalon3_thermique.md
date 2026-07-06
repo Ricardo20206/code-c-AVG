@@ -21,7 +21,7 @@
 | Sonde | Zone | Justification |
 |-------|------|---------------|
 | **NTC1 (GPIO 34)** | Près du régulateur 3,3V / zone alimentation | Détecte surchauffe convertisseurs |
-| **NTC2 (GPIO 35)** | Près du connecteur shunt / INA219 | Détecte échauffement mesure courant |
+| **NTC2 (GPIO 35)** | Près du connecteur shunt / INA237 | Détecte échauffement mesure courant |
 
 ### Isolation thermique (EXF-14)
 
@@ -54,7 +54,7 @@ SIMTEMP 80          # Simuler surchauffe (mode labo LABON)
 
 ## 2. Capteur ambiant (EXF-13)
 
-- **TMP117** à l'adresse I2C 0x48
+- **TMP126** à l'adresse I2C 0x48
 - Position : centre du châssis AGV, à l'écart des flux d'air chaud des moteurs
 - Mesure la température **à l'intérieur du carter**, pas la température extérieure
 
@@ -85,6 +85,6 @@ SIMTEMP 80          # Simuler surchauffe (mode labo LABON)
 | Contrainte | Compromis réalisé |
 |------------|-------------------|
 | Composants face TOP uniquement | NTC côté composants, pas sous PCB |
-| Zone 70×50 mm | INA219 + ESP32 + régulateur compacts |
+| Zone 70×50 mm | INA237 + ESP32 + régulateur compacts |
 | Accessibilité USB/LEDs | Connecteurs sur bord court carte |
 | Routage thermique | NTC1 éloigné des zones de puissance |

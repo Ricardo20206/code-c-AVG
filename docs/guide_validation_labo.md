@@ -27,7 +27,7 @@ pio device monitor
 |---|--------|----------|------------------|
 | 1 | Flash firmware | `pio run -t upload` | Succès compilation |
 | 2 | Ouvrir moniteur | `pio device monitor` | Message "Pret. Tapez HELP" |
-| 3 | Scanner I2C | `I2CSCAN` | 0x40 (INA219), 0x48 (TMP117) détectés |
+| 3 | Scanner I2C | `I2CSCAN` | 0x40 (INA237) détecté ; TMP126 via SPI |
 | 4 | État GPIO alim | `GPIO` | HT=1 en exploitation normale |
 
 ### Étape 2 — Mesure courant (EXF-07 à EXF-10)

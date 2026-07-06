@@ -10,9 +10,9 @@
 #define I2C_SCL_PIN         22
 #define I2C_FREQ_HZ         400000
 
-// --- Mesure de courant (shunt + INA219/INA226 sur bus I2C) ---
-// Shunt 2 mΩ AEC-Q200, gain interne INA219 → plage 0-32A
-#define INA219_I2C_ADDR     0x40
+// --- Mesure de courant (shunt + INA237AIDGST sur bus I2C) ---
+// Shunt 2 mΩ AEC-Q200, calibration INA237 → plage 0-30 A
+#define INA237_I2C_ADDR     0x40
 #define SHUNT_RESISTOR_OHM  0.002f
 #define MAX_CURRENT_A       30.0f
 #define CURRENT_RESOLUTION_A 0.1f
@@ -25,13 +25,17 @@
 #define NTC_NOMINAL_OHM     10000.0f
 #define NTC_NOMINAL_TEMP_C  25.0f
 
-// --- Température ambiante numérique (I2C) ---
-#define AMBIENT_TEMP_I2C_ADDR 0x48   // TMP117
+// --- Température ambiante numérique (SPI, TMP126DCKR) ---
+// Broches à valider sur le schéma PCB Ventec final
+#define TMP126_CS_PIN       5
+#define TMP126_MOSI_PIN     23   // SI
+#define TMP126_MISO_PIN     19   // SO
+#define TMP126_SCLK_PIN     18
 
 // --- Détection source d'alimentation (priorité matérielle USB>BT>HT) ---
-#define PWR_DETECT_USB_PIN  32
-#define PWR_DETECT_BT_PIN   33
-#define PWR_DETECT_HT_PIN   25
+#define PWR_DETECT_USB_PIN  35
+#define PWR_DETECT_BT_PIN   27
+#define PWR_DETECT_HT_PIN   4
 
 // --- Indicateurs locaux ---
 #define LED_GREEN_PIN       14
@@ -48,6 +52,11 @@
 #define GROVE1_I2C_ADDR_VIB 0x18     // LIS3DH (vibration)
 #define GROVE2_I2C_ADDR_HUM 0x44     // SHT31 (humidité)
 // MikroBus LoRa : interface SPI (SX1276), pas I2C
+
+// --- PSRAM ISSI IS66WVS1M8BLL-104NLI (1 Mo, quad SPI, 3.3 V) ---
+// MCU : ESP32-PICO-D4 + PSRAM externe sur bus SDIO (voir include/psram_config.h)
+// Config : sdkconfig.defaults + platformio.ini [env:ventec_monitor]
+#include "psram_config.h"
 
 // --- RTC optionnel (DS3231) pour horodatage absolu ---
 #define RTC_I2C_ADDR        0x68

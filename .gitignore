@@ -25,3 +25,10 @@ Desktop.ini
 .env
 *.pem
 credentials.json
+
+# Android (ventec-ble-api)
+ventec-ble-api/android-app/.gradle/
+ventec-ble-api/android-app/build/
+ventec-ble-api/android-app/app/build/
+ventec-ble-api/android-app/local.properties
+**/.gradle/

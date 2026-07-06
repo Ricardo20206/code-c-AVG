@@ -52,13 +52,14 @@ La carte de monitoring fonctionne en permanence sur le 36 V et permet au technic
 
 | Domaine          | Description                                                         |
 | ---------------- | ------------------------------------------------------------------- |
-| **Courant**      | Mesure continue 0–30 A via shunt 2 mΩ AEC-Q200 + INA219             |
-| **Température**  | 2 sondes NTC sur PCB (ADC) + capteur ambiant TMP117 (I2C)           |
+| **Courant**      | Mesure continue 0–30 A via shunt 2 mΩ AEC-Q200 + INA237AIDGST             |
+| **Température**  | 2 sondes NTC sur PCB (ADC) + capteur ambiant TMP126DCKR (SPI)           |
 | **Alimentation** | Détection de la source active (USB > BT > HT), log des changements  |
 | **Logging**      | Historique horodaté sur LittleFS avec rotation automatique          |
 | **BLE**          | API GATT temps réel + modification des seuils sans reflash          |
 | **USB**          | Export CSV, diagnostic, calibration, commandes maintenance          |
-| **Alertes**      | LED verte (normal), LED rouge + buzzer PWM (alarme)                 |
+| **Alertes**      | LED verte permanente ; LED rouge + buzzer PWM en alarme           |
+| **PSRAM**        | Tampon alarmes/mesures (IS66WVS1M8BLL 1 Mo, obligatoire en prod)  |
 | **Extensions**   | Grove 1 (vibration LIS3DH), Grove 2 (humidité SHT31), MikroBus LoRa |
 | **Calibration**  | Offset/gain courant stockés en NVS, procédure laboratoire intégrée  |
 
@@ -67,20 +68,23 @@ La carte de monitoring fonctionne en permanence sur le 36 V et permet au technic
 
 ## Matériel requis
 
-### Carte cible
+### Carte cible (Ventec AGV Monitor)
 
 
-| Composant       | Référence                       | Rôle                            |
-| --------------- | ------------------------------- | ------------------------------- |
-| Microcontrôleur | ESP32 (avec PSRAM recommandé)   | Traitement, BLE, stockage       |
-| Capteur courant | INA219 @ 0x40                   | Lecture shunt haute courant     |
-| Shunt           | 2 mΩ AEC-Q200                   | Mesure 0–30 A sur batterie 36 V |
-| NTC ×2          | 10 kΩ @ 25°C, β=3950            | Température PCB (GPIO 34, 35)   |
-| Capteur ambiant | TMP117 @ 0x48                   | Température intérieur châssis   |
-| RTC (optionnel) | DS3231 @ 0x68                   | Horodatage absolu               |
-| LEDs            | Verte (GPIO 2), Rouge (GPIO 15) | Signalisation locale            |
-| Buzzer          | GPIO 13 (PWM)                   | Alarme audible                  |
-| USB-C           | —                               | Flash firmware + export logs    |
+| Composant       | Référence                              | Rôle                            |
+| --------------- | -------------------------------------- | ------------------------------- |
+| MCU             | **ESP32-PICO-D4** (flash 4 Mo intégrée)| Traitement, BLE, Wi-Fi          |
+| PSRAM           | **IS66WVS1M8BLL-104NLI** (1 Mo, quad)  | Tampon alarmes + anneau mesures |
+| Capteur courant | INA237AIDGST @ 0x40                    | Lecture shunt haute courant     |
+| Shunt           | 2 mΩ AEC-Q200                          | Mesure 0–30 A sur batterie 36 V |
+| NTC ×2          | 10 kΩ @ 25°C, β=3950                   | Température PCB (GPIO 26, 25)   |
+| Capteur ambiant | TMP126DCKR (SPI)                       | Température intérieur châssis   |
+| RTC (optionnel) | DS3231 @ 0x68                          | Horodatage absolu               |
+| LEDs            | Verte GPIO **14**, Rouge GPIO **15**   | Signalisation locale            |
+| Buzzer          | GPIO 13 (PWM)                          | Alarme audible                  |
+| USB-C           | —                                      | Flash firmware + export logs    |
+
+> Carte de développement sans PSRAM : utiliser l'environnement `ventec_monitor_no_psram` (ESP32 DevKit).
 
 
 ### Outils de développement
@@ -104,17 +108,24 @@ La carte de monitoring fonctionne en permanence sur le 36 V et permet au technic
 ```
 code projet ESP32/
 ├── README.md                   # Ce fichier
-├── platformio.ini              # Configuration build PlatformIO
+├── platformio.ini              # Environnements build (prod / labo / devkit)
+├── sdkconfig.defaults          # Référence GPIO PSRAM (CLK=6, CS=10)
+├── boards/
+│   └── ventec_agv_monitor.json # Board custom ESP32-PICO-D4
 ├── build.bat                   # Script de compilation Windows
+├── monitor_sensors.ps1         # Affichage capteurs via USB
+├── control_buzzer.ps1          # Test buzzer via USB
 │
 ├── include/
 │   ├── board_config.h          # GPIO, seuils, constantes matérielles
+│   ├── psram_config.h          # Référence PSRAM + tableau câblage
 │   └── types.h                 # Structures et énumérations
 │
 ├── src/
-│   ├── main.cpp                # Point d'entrée, boucle principale
-│   ├── current_sensor.cpp      # Mesure courant (INA219 + calibration)
-│   ├── temp_sensors.cpp        # NTC PCB + TMP117 ambiant
+│   ├── main.cpp                # Point d'entrée, boucle principale (v1.3)
+│   ├── current_sensor.cpp      # Mesure courant (INA237AIDGST + calibration)
+│   ├── temp_sensors.cpp        # NTC PCB + TMP126DCKR ambiant
+│   ├── psram_pool.cpp          # Tampons PSRAM / RAM interne (mode labo)
 │   ├── power_monitor.cpp       # Détection source d'alimentation
 │   ├── alarm_manager.cpp       # Seuils, alarmes, dérive consommation
 │   ├── data_logger.cpp         # LittleFS, ring buffer, export CSV
@@ -126,7 +137,10 @@ code projet ESP32/
 │   ├── serial_cli.cpp          # Interface commandes USB
 │   └── time_service.cpp        # Horodatage (RTC ou millis)
 │
+├── ventec-ble-api/             # SDK client BLE (PROTOCOL.md, app Android)
+│
 └── docs/
+    ├── psram_wiring.md         # Câblage PSRAM PICO-D4 ↔ IS66WVS1M8BLL
     ├── i2c_address_map.md      # Tableau adresses I2C (EXF-31)
     ├── jalon1_architecture.md  # Stockage, alimentation, I2C
     ├── jalon2_ble_shunt.md     # Shunt, BLE GATT, boot/reset
@@ -180,13 +194,14 @@ code projet ESP32/
 
 | Module          | Fichiers           | Rôle                                             |
 | --------------- | ------------------ | ------------------------------------------------ |
-| `CurrentSensor` | `current_sensor.*` | Lecture INA219, lissage, application calibration |
-| `TempSensors`   | `temp_sensors.*`   | Conversion NTC (Steinhart), TMP117 I2C           |
+| `CurrentSensor` | `current_sensor.*` | Lecture INA237AIDGST, lissage, application calibration |
+| `TempSensors`   | `temp_sensors.*`   | Conversion NTC (Steinhart), TMP126DCKR SPI           |
 | `PowerMonitor`  | `power_monitor.*`  | Lecture GPIO détection USB/BT/HT                 |
 | `AlarmManager`  | `alarm_manager.*`  | Seuils, hystérésis 3 s, dérive 0,5 A, NVS        |
 | `DataLogger`    | `data_logger.*`    | Ring buffer LittleFS, export CSV                 |
 | `BleService`    | `ble_service.*`    | Serveur GATT NimBLE, notifications               |
-| `Indicators`    | `indicators.*`     | LED verte permanente, alarmes visuelles/sonores  |
+| `Indicators`    | `indicators.*`     | LED verte permanente ; rouge + buzzer en alarme |
+| `PsramPool`     | `psram_pool.*`     | Tampons alarmes/mesures (PSRAM ou RAM interne)  |
 | `I2cManager`    | `i2c_manager.*`    | Grove vibration/humidité, scan bus               |
 | `Calibration`   | `calibration.*`    | Gain/offset courant persisté en NVS              |
 | `LabTest`       | `lab_test.*`       | Simulation sans AGV (validation EXF-10)          |
@@ -241,6 +256,7 @@ temp_sensors.cpp ─────────────────────
 power_monitor.cpp ─────────────────────────────────────┤
 i2c_manager.cpp ───────────────────────────────────────┤
 alarm_manager.cpp ──→ onAlarmTriggered() dans main.cpp ┤
+psram_pool.cpp ────────────────────────────────────────┤
 data_logger.cpp ←──────────────────────────────────────┤
 ble_service.cpp ───────────────────────────────────────┤
 indicators.cpp ────────────────────────────────────────┤
@@ -261,17 +277,24 @@ time_service.cpp ─────────────────────
 
 #### `platformio.ini`
 
-Fichier de **build** : il indique à PlatformIO comment compiler le projet.
+Fichier de **build** : trois environnements selon la carte utilisée.
+
+
+| Environnement              | Carte              | PSRAM   | Usage                                      |
+| -------------------------- | ------------------ | ------- | ------------------------------------------ |
+| `ventec_monitor` (défaut)  | `ventec_agv_monitor` | Obligatoire | Production Ventec (PICO-D4 + IS66WVS1M8BLL) |
+| `ventec_monitor_lab`       | `ventec_agv_monitor` | Optionnelle | Tests sans PSRAM OK (LED, INA237, BLE…)    |
+| `ventec_monitor_no_psram`  | `esp32dev`         | Désactivée | DevKit WROOM sans PSRAM                    |
 
 
 | Paramètre                | Rôle                                                                |
 | ------------------------ | ------------------------------------------------------------------- |
-| `platform = espressif32` | Utilise le SDK Espressif pour ESP32                                 |
-| `board = esp32dev`       | Carte cible (ESP32 DevKit classique)                                |
-| `framework = arduino`    | Framework Arduino (pas ESP-IDF pur)                                 |
-| `monitor_speed = 115200` | Vitesse du port série USB                                           |
-| `build_flags`            | Active la PSRAM, niveau de debug                                    |
-| `lib_deps`               | Bibliothèques externes à télécharger (NimBLE, INA219, TMP117, etc.) |
+| `platform = espressif32` | SDK Espressif pour ESP32                                            |
+| `board = ventec_agv_monitor` | ESP32-PICO-D4, flash DIO, `dio_qspi`                            |
+| `board_build.psram = enabled` | Active la PSRAM externe                                        |
+| `framework = arduino`      | Framework Arduino                                                   |
+| `monitor_speed = 115200`   | Vitesse du port série USB                                           |
+| `lib_deps`               | NimBLE, INA237, TMP126, LIS3DH, SHT31, RTClib                       |
 
 
 Sans ce fichier, PlatformIO ne sait pas quoi compiler ni quelles bibliothèques utiliser.
@@ -291,7 +314,7 @@ Script Windows **raccourci** : installe PlatformIO si absent, puis lance la comp
 Il centralise toutes les constantes matérielles :
 
 - **GPIO** : quelle broche ESP32 est branchée à quoi (LED, buzzer, NTC, détection alim)
-- **Adresses I2C** : 0x40 pour INA219, 0x48 pour TMP117, etc.
+- **Adresses I2C** : 0x40 pour INA237AIDGST, etc. TMP126DCKR est sur SPI (pas I2C).
 - **Seuils par défaut** : 15 A warning, 20 A alarme, 75 °C
 - **Périodes** : mesure toutes les 500 ms, log toutes les 5 s
 - **Limites stockage** : 2000 mesures max, 200 alarmes max
@@ -326,11 +349,12 @@ C'est le **contrat de données** entre tous les modules : tout le monde parle le
 
 `**setup()`** — exécuté une fois au démarrage :
 
-1. Ouvre le port série USB (115200 baud)
-2. Alloue la mémoire PSRAM pour les 50 dernières alarmes
-3. Initialise tous les modules dans l'ordre : `g_time`, `g_i2c`, `g_power`, `g_current`, `g_temp`, `g_logger`, `g_alarm`, `g_indicators`, `g_ble`
-4. Enregistre l'événement de boot dans les logs
-5. Vérifie si l'INA219 est présent sur le bus I2C
+1. Allume la **LED verte** (GPIO 14) immédiatement
+2. Ouvre le port série USB (115200 baud)
+3. Initialise PSRAM (`g_psram`) — arrêt si obligatoire et échec (`ventec_monitor`)
+4. Initialise les modules : `g_time`, `g_i2c`, `g_power`, `g_current`, `g_temp`, `g_logger`, `g_alarm`, `g_indicators`, `g_ble`
+5. Enregistre l'événement de boot dans les logs
+6. Vérifie si l'INA237AIDGST répond sur le bus I2C
 
 `**loop()**` — exécuté en boucle infinie, cadencé par des timers :
 
@@ -368,8 +392,8 @@ La variable globale `g_live` est le **tableau de bord instantané** : toutes les
 
 **Fonctionnement :**
 
-1. Communique avec le chip **INA219** sur le bus I2C (adresse 0x40)
-2. L'INA219 mesure la tension aux bornes du **shunt 2 mΩ** placé en série avec la batterie
+1. Communique avec le chip **INA237AIDGST** sur le bus I2C (adresse 0x40)
+2. L'INA237AIDGST mesure la tension aux bornes du **shunt 2 mΩ** placé en série avec la batterie
 3. Applique une correction de gain car le shunt réel (2 mΩ) diffère du shunt de référence de la bibliothèque (100 mΩ)
 4. Passe la valeur brute dans `g_calib.apply()` pour la calibration
 5. Applique un **lissage exponentiel** (70 % ancienne valeur + 30 % nouvelle) pour filtrer le bruit
@@ -379,10 +403,10 @@ La variable globale `g_live` est le **tableau de bord instantané** : toutes les
 
 | Méthode          | Description                                                     |
 | ---------------- | --------------------------------------------------------------- |
-| `begin()`        | Initialise l'INA219                                             |
+| `begin()`        | Initialise l'INA237AIDGST                                             |
 | `readCurrentA()` | Retourne le courant calibré et lissé en ampères                 |
 | `readRawAmps()`  | Retourne la valeur brute avant calibration (pour `CAL` en labo) |
-| `isHealthy()`    | `true` si l'INA219 répond sur I2C                               |
+| `isHealthy()`    | `true` si l'INA237AIDGST répond sur I2C                               |
 
 
 #### `src/temp_sensors.h` + `src/temp_sensors.cpp`
@@ -391,10 +415,11 @@ La variable globale `g_live` est le **tableau de bord instantané** : toutes les
 
 **Deux technologies différentes :**
 
-**NTC PCB 1 et 2** (GPIO 34 et 35, entrées ADC) :
+**NTC PCB 1 et 2** (GPIO **26** et **25**, entrées ADC) :
 
 ```
 3,3V ──[10kΩ]──┬── NTC ── GND
+               ├── 100 nF ── GND
                └── GPIO ADC
 ```
 
@@ -403,7 +428,7 @@ La variable globale `g_live` est le **tableau de bord instantané** : toutes les
 3. Déduit la résistance de la NTC
 4. Applique l'équation de **Steinhart-Hart** (coefficient β = 3950) pour obtenir °C
 
-**TMP117 ambiant** (I2C 0x48) :
+**TMP126DCKR ambiant** (SPI : CS=5, MOSI=23, MISO=19, SCLK=18) :
 
 - Capteur numérique haute précision
 - Mesure la température à l'intérieur du châssis AGV
@@ -418,9 +443,9 @@ Le circuit matériel (ORing) assure la priorité **USB > BT > HT**. Le firmware 
 
 | GPIO | HIGH signifie              |
 | ---- | -------------------------- |
-| 32   | USB-C actif                |
-| 33   | Batterie de service active |
-| 25   | Batterie 36 V active       |
+| 35   | USB-C actif                |
+| 27   | Batterie de service active |
+| 4    | Batterie 36 V active       |
 
 
 `hasSourceChanged()` compare l'état actuel au précédent : si différent, `main.cpp` enregistre un événement `POWER_CHANGE` dans les logs.
@@ -528,11 +553,11 @@ Service Ventec (UUID 6e400001-...)
 **Rôle :** signalisation **physique** sur la carte pour le technicien présent sur site (EXF-24 à EXF-27).
 
 
-| État                      | LED verte | LED rouge | Buzzer                          |
-| ------------------------- | --------- | --------- | ------------------------------- |
-| Normal                    | ON fixe   | OFF       | OFF                             |
-| Warning (>15 A)           | OFF       | Clignote  | Clignote + double bip 1500 Hz   |
-| Critique (>20 A ou >75°C) | OFF       | ON fixe   | ON continu + triple bip 2500 Hz |
+| État                      | LED verte (GPIO 14) | LED rouge (GPIO 15) | Buzzer                          |
+| ------------------------- | ------------------- | ------------------- | ------------------------------- |
+| Normal                    | ON permanente       | OFF                 | OFF                             |
+| Warning (>15 A)           | ON permanente       | Clignote            | Clignote + double bip 1500 Hz   |
+| Critique (>20 A ou >75°C) | ON permanente       | ON fixe             | ON continu + triple bip 2500 Hz |
 
 
 Le buzzer utilise le **PWM** (LED Control du ESP32) : `ledcWriteTone()` permet de choisir la fréquence, ce qui crée des motifs sonores distincts (EXF-27).
@@ -656,8 +681,9 @@ Ces fichiers ne sont **pas compilés** : ils documentent et justifient les choix
 | `board_config.h`     | Toutes les constantes matérielles (GPIO, seuils, adresses) |
 | `types.h`            | Toutes les structures de données partagées                 |
 | `main.cpp`           | Orchestre tout : init, boucle, timers, coordination        |
-| `current_sensor.cpp` | Lit le courant batterie via INA219 + shunt                 |
-| `temp_sensors.cpp`   | Lit 2 NTC (ADC) + TMP117 (I2C)                             |
+| `current_sensor.cpp` | Lit le courant batterie via INA237AIDGST + shunt                 |
+| `temp_sensors.cpp`   | Lit 2 NTC (GPIO 26/25) + TMP126DCKR (SPI)                  |
+| `psram_pool.cpp`     | Tampons alarmes/mesures PSRAM ou RAM interne               |
 | `power_monitor.cpp`  | Détecte quelle source alimente la carte                    |
 | `alarm_manager.cpp`  | Décide s'il y a une alarme, gère les seuils                |
 | `data_logger.cpp`    | Enregistre l'historique sur flash (ring buffer)            |
@@ -687,7 +713,7 @@ Chaque paire `.h` / `.cpp` suit la convention C++ classique : le `.h` déclare l
 | EXF-10    | OBLIGATOIRE | Validation labo (points test, simulation)        | `lab_test`, `calibration`      |
 | EXF-11    | OBLIGATOIRE | 2 sondes NTC PCB                                 | `temp_sensors`                 |
 | EXF-12    | OBLIGATOIRE | Diviseur + filtrage ADC NTC                      | `temp_sensors`                 |
-| EXF-13    | OBLIGATOIRE | Capteur température ambiante numérique           | `temp_sensors` (TMP117)        |
+| EXF-13    | OBLIGATOIRE | Capteur température ambiante numérique           | `temp_sensors` (TMP126DCKR)        |
 | EXF-15    | OBLIGATOIRE | Historique horodaté courant + température        | `data_logger`                  |
 | EXF-16    | OBLIGATOIRE | Alarmes avec timestamp et valeur                 | `data_logger`, `alarm_manager` |
 | EXF-17    | OBLIGATOIRE | Logs système (boot, alim, connexions)            | `data_logger`, `main`          |
@@ -729,18 +755,27 @@ pip install platformio
 
 ```powershell
 cd "c:\Users\mberi\Desktop\code projet ESP32"
-python -m platformio run
+python -m platformio run                    # production (ventec_monitor)
+python -m platformio run -e ventec_monitor_lab   # carte Ventec, PSRAM optionnelle
+python -m platformio run -e ventec_monitor_no_psram  # DevKit sans PSRAM
 ```
 
 Ou double-cliquer sur `build.bat` (Windows).
 
-### Environnement PlatformIO
+### Environnements PlatformIO
 
 
-| Paramètre        | Valeur              |
+| Environnement             | Board                | PSRAM        | Quand l'utiliser                    |
+| ------------------------- | -------------------- | ------------ | ----------------------------------- |
+| `ventec_monitor`          | `ventec_agv_monitor` | Obligatoire  | Carte Ventec finale                 |
+| `ventec_monitor_lab`      | `ventec_agv_monitor` | Optionnelle  | Debug PSRAM / tests capteurs sur PCB |
+| `ventec_monitor_no_psram` | `esp32dev`           | Désactivée   | ESP32 DevKit WROOM                  |
+
+
+| Paramètre        | Valeur production   |
 | ---------------- | ------------------- |
 | Plateforme       | `espressif32` 7.0.1 |
-| Carte            | `esp32dev`          |
+| MCU              | ESP32-PICO-D4       |
 | Framework        | Arduino             |
 | Vitesse moniteur | 115200 baud         |
 
@@ -751,8 +786,8 @@ Ou double-cliquer sur `build.bat` (Windows).
 | Bibliothèque    | Version | Usage                |
 | --------------- | ------- | -------------------- |
 | NimBLE-Arduino  | ^1.4.2  | Stack BLE            |
-| Adafruit INA219 | ^1.2.3  | Mesure courant       |
-| Adafruit TMP117 | ^1.0.2  | Température ambiante |
+| Adafruit INA237 and INA238 Library | latest | Mesure courant       |
+| TMP126 (edovis)                    | 1.0.0  | Température ambiante |
 | Adafruit LIS3DH | ^1.2.4  | Vibration (Grove 1)  |
 | Adafruit SHT31  | ^2.2.2  | Humidité (Grove 2)   |
 | RTClib          | ^2.1.4  | RTC DS3231 optionnel |
@@ -765,13 +800,20 @@ Ou double-cliquer sur `build.bat` (Windows).
 ### Flasher la carte
 
 ```powershell
-python -m platformio run -t upload
+# Production Ventec
+python -m platformio run -e ventec_monitor -t upload --upload-port COM3
+
+# Mode labo (PSRAM non bloquante)
+python -m platformio run -e ventec_monitor_lab -t upload --upload-port COM3
 ```
 
-Brancher l'ESP32 en USB-C. Si plusieurs ports sont disponibles :
+> Fermer le moniteur série avant l'upload (`Ctrl+C`). Si le port est occupé ou introuvable, vérifier le câble USB et lancer `python -m platformio device list`.
+
+Reflash propre après changement PSRAM :
 
 ```powershell
-python -m platformio run -t upload --upload-port COM3
+python -m platformio run -e ventec_monitor -t fullclean
+python -m platformio run -e ventec_monitor -t upload --upload-port COM3
 ```
 
 ### Ouvrir le moniteur série
@@ -783,8 +825,16 @@ python -m platformio device monitor
 Au démarrage, la carte affiche :
 
 ```
-Ventec AGV Monitor v1.1 - demarrage
+Ventec AGV Monitor v1.3 - demarrage
 Pret. Tapez HELP pour les commandes.
+```
+
+En production, si la PSRAM est OK :
+
+```
+PSRAM IS66WVS1M8BLL-104NLI : init (PICO-D4, CLK=GPIO6 CS=GPIO10)
+  psramFound()     : oui
+  ESP.getPsramSize : 1024 Ko
 ```
 
 ### Reprogrammation terrain (EXF-34)
@@ -815,6 +865,10 @@ Toutes les commandes sont envoyées via le moniteur série (115200 baud). Insens
 | `CLEAR`            | Efface tous les logs                                    |
 | `GPIO`             | État des broches de détection d'alimentation            |
 | `STORAGE`          | Statistiques de stockage (volumes, compteurs)           |
+| `PSRAM`            | État PSRAM / tampons alarmes                            |
+| `SENSORS`          | Affichage détaillé de tous les capteurs                 |
+| `MONITOR ON/OFF`   | Affichage capteurs toutes les 1 s                       |
+| `VERSION`          | Version firmware (v1.3)                                 |
 
 
 ### Diagnostic et bus I2C
@@ -823,7 +877,7 @@ Toutes les commandes sont envoyées via le moniteur série (115200 baud). Insens
 | Commande                       | Description                                      |
 | ------------------------------ | ------------------------------------------------ |
 | `I2CSCAN`                      | Scan du bus I2C (détecte tous les périphériques) |
-| `RAW`                          | Valeur brute INA219 avant calibration            |
+| `RAW`                          | Valeur brute INA237AIDGST avant calibration            |
 | `THRESH`                       | Affiche les seuils d'alarme actuels              |
 | `THRESH <warn> <alarm> <temp>` | Modifie les seuils (ex: `THRESH 15 20 75`)       |
 
@@ -844,15 +898,49 @@ Toutes les commandes sont envoyées via le moniteur série (115200 baud). Insens
 3. `CAL 10.0` → appliquer la calibration
 4. `STATUS` → vérifier que le courant affiché ≈ 10,0 A (±0,5 A)
 
+### Tests capteurs (INA237, NTC PCB)
+
+**INA237 (courant)** — mode réel (`LABOFF`) :
+
+```text
+I2CSCAN          # doit afficher 0x40
+RAW              # courant brut (A)
+STATUS           # courant calibré + températures
+CAL 10.0         # calibration avec 10 A de référence
+```
+
+**NTC PCB 1 / PCB 2** — mode réel (`LABOFF`) :
+
+```text
+STATUS           # T° PCB1 (GPIO 26), PCB2 (GPIO 25), ambiante
+SENSORS          # détail capteurs
+MONITOR ON       # affichage continu 1 Hz
+```
+
+Test alarme température sans chauffer la carte :
+
+```text
+LABON
+SIMTEMP 80       # PCB1
+SIMTEMP2 80      # PCB2
+LABOFF
+```
+
+Script PC : `.\monitor_sensors.ps1 -Port COM3`
+
 ### Mode laboratoire
 
 
-| Commande      | Description                                         |
-| ------------- | --------------------------------------------------- |
-| `LABON`       | Active le mode simulation (sans AGV)                |
-| `LABOFF`      | Désactive le mode simulation                        |
-| `SIM <A>`     | Simule un courant (ex: `SIM 22` pour tester alarme) |
-| `SIMTEMP <C>` | Simule la température PCB1 (ex: `SIMTEMP 80`)       |
+| Commande        | Description                                         |
+| --------------- | --------------------------------------------------- |
+| `LABON`         | Active le mode simulation (sans AGV)                |
+| `LABOFF`        | Désactive le mode simulation (capteurs réels)       |
+| `SIM <A>`       | Simule un courant (ex: `SIM 22` pour tester alarme) |
+| `SIMTEMP <C>`   | Simule la température PCB1 (ex: `SIMTEMP 80`)       |
+| `SIMTEMP2 <C>`  | Simule la température PCB2                          |
+| `SIMAMB <C>`    | Simule la température ambiante                      |
+| `SIMHUM <%>`    | Simule l'humidité                                   |
+| `SIMVIB <mg>`   | Simule la vibration                                 |
 
 
 ---
@@ -884,6 +972,9 @@ Toutes les commandes sont envoyées via le moniteur série (115200 baud). Insens
 | Seuils       | `...0005`      | struct 16 octets | READ, WRITE  | warn_A, alarm_A, temp_C, drift_A |
 | Logs         | `...0006`      | string CSV       | READ         | Export historique complet        |
 | Statut       | `...0007`      | uint8 × 4        | READ, NOTIFY | source, vib, hum, lora           |
+| Télémétrie   | `...0008`      | 10 octets        | READ, NOTIFY | humidité, vibration, flags       |
+| Alarme event | `...0009`      | 14 octets        | READ, NOTIFY | événement alarme (notify immédiat) |
+| Alarmes hist.| `...000a`      | binaire          | READ         | tampon PSRAM (jusqu'à 50)        |
 
 
 ### Écriture des seuils via BLE (EXF-23)
@@ -899,6 +990,14 @@ Toutes les commandes sont envoyées via le moniteur série (115200 baud). Insens
 
 Les seuils sont persistés en NVS et survivent au redémarrage.
 
+### SDK client tablette
+
+Le dossier [`ventec-ble-api/`](ventec-ble-api/README.md) contient :
+
+- `PROTOCOL.md` — spécification octets / UUID
+- `android/` — parsers Kotlin réutilisables
+- `android-app/` — **app Android minimale** (écran technicien BLE)
+
 ---
 
 ## Alarmes et seuils
@@ -906,11 +1005,11 @@ Les seuils sont persistés en NVS et survivent au redémarrage.
 ### Niveaux d'alarme
 
 
-| Niveau       | Condition                                        | Signalisation                     |
-| ------------ | ------------------------------------------------ | --------------------------------- |
-| **Normal**   | Tout dans les limites                            | LED verte allumée en permanence   |
-| **Warning**  | Courant ≥ 15 A pendant 3 s                       | LED rouge clignotante, double bip |
-| **Critique** | Courant ≥ 20 A pendant 3 s **ou** T° PCB ≥ 75 °C | LED rouge fixe + buzzer continu   |
+| Niveau       | Condition                                        | Signalisation                                      |
+| ------------ | ------------------------------------------------ | -------------------------------------------------- |
+| **Normal**   | Tout dans les limites                            | LED verte permanente ; rouge éteinte               |
+| **Warning**  | Courant ≥ 15 A pendant 3 s                       | Verte permanente ; rouge clignotante + double bip  |
+| **Critique** | Courant ≥ 20 A pendant 3 s **ou** T° PCB ≥ 75 °C | Verte permanente ; rouge fixe + buzzer continu     |
 
 
 ### Détection de dérive (EXF-09)
@@ -962,12 +1061,25 @@ Lorsque la capacité d'un fichier est atteinte, l'entrée la plus ancienne est �
 | `TECH_USB_CONN`    | Connexion USB technicien            |
 | `TECH_BLE_CONN`    | Connexion BLE technicien            |
 | `THRESHOLD_CHANGE` | Modification des seuils             |
-| `SENSOR_FAULT`     | Capteur INA219 non détecté          |
+| `SENSOR_FAULT`     | INA237 ou PSRAM indisponible              |
 
 
 ### Tampon PSRAM (EXF-25)
 
-Les 50 dernières alarmes sont conservées en PSRAM pour un accès rapide via BLE, en complément du stockage persistant LittleFS.
+Les 50 dernières alarmes et un anneau de 128 mesures sont conservés en **PSRAM** (IS66WVS1M8BLL, 1 Mo) pour un accès rapide via BLE (`...000a`), en complément du stockage persistant LittleFS.
+
+Câblage PSRAM (bus SDIO partagé flash intégrée) : voir [`docs/psram_wiring.md`](docs/psram_wiring.md).
+
+| Signal PSRAM | GPIO ESP32-PICO-D4 |
+| ------------ | ------------------ |
+| CLK          | 6 (SD_CLK)         |
+| CE#          | 10 (SD_DATA_3)     |
+| SIO0         | 8                  |
+| SIO1         | 17                 |
+| SIO2         | 7                  |
+| SIO3         | 11                 |
+
+En mode `ventec_monitor_lab`, si la PSRAM échoue, les tampons basculent en **RAM interne** et le firmware continue.
 
 ### Export CSV
 
@@ -990,7 +1102,7 @@ SYS,12300000,1,0,0,0
 
 ### Principe
 
-Le firmware applique une correction linéaire au courant brut de l'INA219 :
+Le firmware applique une correction linéaire au courant brut de l'INA237AIDGST :
 
 ```
 courant_calibré = (courant_brut - offset) × gain
@@ -1025,13 +1137,14 @@ Le mode labo permet de valider le firmware **sans AGV connecté** :
 
 ```
 LABON
-SIM 16          # Simule 16 A → alarme warning après 3 s
-SIM 22          # Simule 22 A → alarme critique
-SIMTEMP 80      # Simule 80 °C PCB → alarme critique température
-LABOFF          # Retour au mode normal
+SIM 16          # Simule 16 A → alarme warning après 3 s (rouge clignote)
+SIM 22          # Simule 22 A → alarme critique (rouge fixe + buzzer)
+SIMTEMP 80      # Simule 80 °C PCB1 → alarme critique température
+SIMTEMP2 80     # Simule 80 °C PCB2
+LABOFF          # Retour aux capteurs réels (INA237, NTC, TMP126)
 ```
 
-En mode labo, les valeurs simulées remplacent les lectures capteurs réelles. Les alarmes, LEDs, buzzer et logging fonctionnent normalement.
+En mode labo, les valeurs simulées remplacent les lectures capteurs réelles. La **LED verte reste allumée** ; seule la **rouge** signale les alarmes. Le buzzer et le logging fonctionnent normalement.
 
 ---
 
@@ -1048,14 +1161,16 @@ Tous les paramètres matériels sont centralisés dans `include/board_config.h`.
 | -------------------- | ---- | -------------- |
 | I2C SDA              | 21   | Bidirectionnel |
 | I2C SCL              | 22   | Bidirectionnel |
-| NTC PCB 1 (ADC)      | 34   | Entrée         |
-| NTC PCB 2 (ADC)      | 35   | Entrée         |
-| Détection USB        | 32   | Entrée         |
-| Détection BT service | 33   | Entrée         |
-| Détection HT 36V     | 25   | Entrée         |
-| LED verte            | 2    | Sortie         |
+| NTC PCB 1 (ADC)      | 26   | Entrée         |
+| NTC PCB 2 (ADC)      | 25   | Entrée         |
+| TMP126 CS / MOSI / MISO / SCLK | 5 / 23 / 19 / 18 | SPI |
+| Détection USB        | 35   | Entrée         |
+| Détection BT service | 27   | Entrée         |
+| Détection HT 36V     | 4    | Entrée         |
+| LED verte            | 14   | Sortie         |
 | LED rouge            | 15   | Sortie         |
 | Buzzer (PWM)         | 13   | Sortie         |
+| PSRAM CLK / CS       | 6 / 10 | SDIO partagé |
 | Bouton BOOT          | 0    | Entrée         |
 | Bouton RESET         | 16   | Entrée         |
 
@@ -1079,8 +1194,8 @@ Tous les paramètres matériels sont centralisés dans `include/board_config.h`.
 
 | Composant          | Adresse 7 bits | Connecteur           |
 | ------------------ | -------------- | -------------------- |
-| INA219 (courant)   | 0x40           | Embarqué             |
-| TMP117 (ambiante)  | 0x48           | Embarqué             |
+| INA237AIDGST (courant)   | 0x40           | Embarqué (I2C)       |
+| TMP126DCKR (ambiante)     | SPI            | Embarqué             |
 | DS3231 (RTC)       | 0x68           | Embarqué (optionnel) |
 | LIS3DH (vibration) | 0x18           | Grove 1              |
 | SHT31 (humidité)   | 0x44           | Grove 2              |
@@ -1098,8 +1213,8 @@ I2CSCAN
 Résultat attendu en configuration nominale :
 
 ```
-  0x40 detecte    (INA219)
-  0x48 detecte    (TMP117)
+  0x40 detecte    (INA237AIDGST)
+  TMP126          via SPI (ID 0x2126)
   0x68 detecte    (DS3231, si présent)
 ```
 
@@ -1110,11 +1225,13 @@ Résultat attendu en configuration nominale :
 
 | Document                                                       | Contenu                                       | Jalon   |
 | -------------------------------------------------------------- | --------------------------------------------- | ------- |
+| [docs/psram_wiring.md](docs/psram_wiring.md)                   | Câblage PSRAM PICO-D4, flash, diagnostic      | Prod    |
 | [docs/jalon1_architecture.md](docs/jalon1_architecture.md)     | Architecture stockage, rotation, alimentation | Jalon 1 |
 | [docs/jalon2_ble_shunt.md](docs/jalon2_ble_shunt.md)           | Câblage shunt IN+/IN-, GATT BLE, boot/reset   | Jalon 2 |
 | [docs/jalon3_thermique.md](docs/jalon3_thermique.md)           | Placement NTC, isolation thermique            | Jalon 3 |
 | [docs/guide_validation_labo.md](docs/guide_validation_labo.md) | Checklist complète de validation              | Tous    |
 | [docs/i2c_address_map.md](docs/i2c_address_map.md)             | Tableau adresses I2C, compatibilité 3,3 V     | Jalon 1 |
+| [ventec-ble-api/PROTOCOL.md](ventec-ble-api/PROTOCOL.md)       | Spécification BLE GATT octets / UUID          | BLE     |
 
 
 ---
@@ -1137,10 +1254,29 @@ Utiliser la forme complète :
 python -m platformio run
 ```
 
-### INA219 non détecté au démarrage
+### PSRAM non détectée / arrêt au boot
 
 ```
-ATTENTION: INA219 non detecte (verifier I2C)
+E (664) spiram: SPI SRAM memory test fail. 32768/65536 writes failed
+*** ARRET : PSRAM IS66WVS1M8BLL OBLIGATOIRE ***
+```
+
+Vérifications matérielles (voir `docs/psram_wiring.md`) :
+
+1. Soudure PSRAM — surtout **SIO2 → GPIO7**, **CS → GPIO10**, **CLK → GPIO6**
+2. Alimentation 3,3 V + condensateur 100 nF sur VDD PSRAM
+3. Reflash propre : `pio run -e ventec_monitor -t fullclean && upload`
+
+Pour continuer les tests sans PSRAM :
+
+```powershell
+python -m platformio run -e ventec_monitor_lab -t upload --upload-port COMx
+```
+
+### INA237AIDGST non détecté au démarrage
+
+```
+ATTENTION: INA237 non detecte (verifier I2C)
 ```
 
 Vérifications :
@@ -1149,6 +1285,13 @@ Vérifications :
 2. Câblage SDA (GPIO 21) et SCL (GPIO 22)
 3. Alimentation 3,3 V du capteur
 4. Résistances de pull-up I2C (4,7 kΩ typique)
+
+### NTC PCB : valeurs aberrantes (-40 °C ou figées)
+
+1. Vérifier le diviseur 10 kΩ + NTC + condensateur 100 nF
+2. `LABOFF` pour désactiver la simulation
+3. `STATUS` — PCB1 = GPIO 26, PCB2 = GPIO 25
+4. Chauffer localement une NTC : seule la sonde concernée doit monter
 
 ### Pas de données BLE
 
@@ -1165,10 +1308,16 @@ Vérifications :
 
 ### Flash échoue (port COM)
 
-1. Installer le driver USB-UART (CP2102 ou CH340 selon la carte)
-2. Identifier le port : `python -m platformio device list`
-3. Flasher avec le port explicite : `--upload-port COMx`
-4. Maintenir BOOT enfoncé si la séquence auto DTR/RTS échoue
+```
+Could not open COMx, the port is busy or doesn't exist
+```
+
+1. Fermer le moniteur série (`Ctrl+C`) avant l'upload
+2. Débrancher/rebrancher le câble USB (câble **données**, pas charge seule)
+3. Installer le driver USB-UART (CP2102 ou CH340)
+4. Identifier le port : `python -m platformio device list`
+5. Flasher avec le port explicite : `--upload-port COMx`
+6. Maintenir BOOT enfoncé si la séquence auto DTR/RTS échoue
 
 ### Logs vides après `EXPORT`
 
@@ -1182,15 +1331,15 @@ Projet développé dans le cadre du cahier des charges **Ventec Systems — Cart
 
 - **Client :** Ventec Systems
 - **Plateforme :** ESP32 / PlatformIO / Arduino
-- **Version firmware :** 1.1
+- **Version firmware :** 1.3
 
 ---
 
 ## Prochaines étapes
 
-- Valider le mapping GPIO avec le schéma PCB définitif
+- Valider la soudure PSRAM (IS66WVS1M8BLL) et confirmer `psramFound(): oui`
 - Calibrer le shunt en laboratoire (procédure `docs/guide_validation_labo.md`)
-- Tester l'API BLE avec nRF Connect sur site
+- Tester l'API BLE avec l'app Android (`ventec-ble-api/android-app/`)
 - Intégrer le module LoRa MikroBus (driver SPI SX1276)
-- Présenter les justifications Jalon 1, 2 et 3
+- Valider GPIO définitifs avec le schéma PCB Ventec final
 

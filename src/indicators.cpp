@@ -1,4 +1,3 @@
-
 #include "indicators.h"
 #include "board_config.h"
 #include <Arduino.h>
@@ -10,7 +9,7 @@ bool Indicators::begin() {
     pinMode(LED_RED_PIN, OUTPUT);
     ledcSetup(BUZZER_PWM_CHANNEL, BUZZER_PWM_FREQ, 8);
     ledcAttachPin(BUZZER_PIN, BUZZER_PWM_CHANNEL);
-    setGreen(true);  // EXF-24 : LED verte permanente en fonctionnement normal
+    setGreen(true);  // EXF-24 : LED verte permanente
     setRed(false);
     setBuzzer(false);
     return true;
@@ -21,6 +20,14 @@ void Indicators::setRed(bool on)   { digitalWrite(LED_RED_PIN, on ? HIGH : LOW);
 
 void Indicators::setBuzzer(bool on) {
     ledcWrite(BUZZER_PWM_CHANNEL, on ? 128 : 0);
+}
+
+void Indicators::stopBuzzer() {
+    ledcWrite(BUZZER_PWM_CHANNEL, 0);
+}
+
+void Indicators::startBuzzer(uint16_t freqHz) {
+    ledcWriteTone(BUZZER_PWM_CHANNEL, freqHz);
 }
 
 void Indicators::playTone(uint16_t freqHz, uint16_t durationMs) {
@@ -44,15 +51,15 @@ void Indicators::playPattern(AlarmLevel level) {
 }
 
 void Indicators::update(AlarmLevel level) {
+    setGreen(true);  // EXF-24 : LED verte permanente (y compris en alarme)
+
     switch (level) {
         case AlarmLevel::NONE:
-            setGreen(true);
             setRed(false);
             setBuzzer(false);
             break;
 
         case AlarmLevel::WARNING:
-            setGreen(false);
             _blinkState = !_blinkState;
             setRed(_blinkState);
             setBuzzer(_blinkState);
@@ -60,7 +67,6 @@ void Indicators::update(AlarmLevel level) {
 
         case AlarmLevel::CRITICAL:
             // EXF-25 : LED rouge + buzzer simultanés
-            setGreen(false);
             setRed(true);
             setBuzzer(true);
             break;

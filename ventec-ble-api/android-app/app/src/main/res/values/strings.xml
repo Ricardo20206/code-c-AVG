@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ventec Monitor</string>
+    <string name="scan_connect">Scanner et connecter</string>
+    <string name="disconnect">Déconnecter</string>
+    <string name="status_idle">Appuyez sur Scanner pour trouver Ventec-AGV-Monitor</string>
+    <string name="status_scanning">Recherche en cours…</string>
+    <string name="status_connecting">Connexion…</string>
+    <string name="status_connected">Connecté — réception des données</string>
+    <string name="status_disconnected">Déconnecté</string>
+    <string name="live_title">Mesures live (BLE)</string>
+    <string name="waiting_data">En attente de données…</string>
+</resources>

@@ -1,17 +1,17 @@
 #include "temp_sensors.h"
 #include "board_config.h"
-#include <Adafruit_TMP117.h>
 #include <Arduino.h>
-#include <Wire.h>
+#include <TMP126.h>
 #include <cmath>
 
 TempSensors g_temp;
-static Adafruit_TMP117 tmp117;
+static TMP126 tmp126(TMP126_CS_PIN, TMP126_MOSI_PIN, TMP126_MISO_PIN, TMP126_SCLK_PIN);
 
 bool TempSensors::begin() {
     analogReadResolution(12);
     analogSetAttenuation(ADC_11db);
-    _ambientOk = tmp117.begin(AMBIENT_TEMP_I2C_ADDR);
+    tmp126.begin();
+    _ambientOk = tmp126.getStatus();
     return true;
 }
 
@@ -36,7 +36,5 @@ float TempSensors::readPcb2C() { return ntcAdcToCelsius(NTC_PCB2_ADC_PIN); }
 
 float TempSensors::readAmbientC() {
     if (!_ambientOk) return -999.0f;
-    sensors_event_t event;
-    tmp117.getEvent(&event);
-    return event.temperature;
+    return tmp126.getTemp();
 }

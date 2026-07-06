@@ -1,23 +1,25 @@
 #pragma once
 
+#include "ble_snapshot.h"
 #include "types.h"
 
 class BleService {
 public:
     bool begin();
-    void updateLiveData(const LiveData& data);
+    void updateSnapshot(const BleSnapshot& snap);
     void notifyIfConnected();
+    void notifyAlarmEvent(const AlarmRecord& rec);
     bool isConnected() const { return _connected; }
     void setConnected(bool c) { _connected = c; }
 
-    static void onThresholdsWritten(const AlarmThresholds& t);
-
 private:
     void setupGatt();
-    void notifyCharacteristics();
+    void notifyLiveCharacteristics();
+    void notifyTelemetry();
 
-    bool     _connected = false;
-    LiveData _live{};
+    bool         _connected = false;
+    BleSnapshot  _snap{};
+    AlarmRecord  _lastAlarmNotify{};
 
     friend class ServerCallbacks;
 };

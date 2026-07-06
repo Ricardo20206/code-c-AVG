@@ -8,6 +8,8 @@ public:
     void update(AlarmLevel level);
     void playTone(uint16_t freqHz, uint16_t durationMs);
     void playPattern(AlarmLevel level);
+    void startBuzzer(uint16_t freqHz);
+    void stopBuzzer();
 
 private:
     void setGreen(bool on);

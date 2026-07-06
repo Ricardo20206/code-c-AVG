@@ -12,7 +12,7 @@ Batterie 36V (+) ──► Charge AGV ──► Batterie 36V (-)
               IN+ (côté batterie +)
               IN- (côté charge)
                          │
-                    [INA219]
+                    [INA237]
 ```
 
 - **IN+** : côté **haut** du shunt (vers le pôle + batterie / entrée courant)
@@ -40,7 +40,7 @@ Batterie 36V (+) ──► Charge AGV ──► Batterie 36V (-)
 
 ```
 LABON                  # Activer mode labo
-RAW                    # Lire valeur brute INA219
+RAW                    # Lire valeur brute INA237
 CAL 10.0               # Calibrer avec 10A mesurés au multimètre
 STATUS                 # Vérifier après calibration
 SIM 25.0               # Tester alarme sans AGV
@@ -71,14 +71,19 @@ SIM 25.0               # Tester alarme sans AGV
 | Seuils | `...0005` | struct 16B | READ, WRITE | warn_A, alarm_A, temp_C, drift_A |
 | Logs | `...0006` | string CSV | READ | Export historique |
 | Statut | `...0007` | uint8[4] | READ, NOTIFY | source, vib, hum, lora |
+| Télémétrie | `...0008` | 10 B | READ, NOTIFY | humidité, vibration, flags capteurs |
+| Alarme event | `...0009` | 14 B | READ, NOTIFY | dernier événement alarme (immédiat) |
+| Historique alarmes | `...000a` | variable | READ | tampon PSRAM (count + records) |
 
 ### Test avec nRF Connect
 
 1. Scanner → connecter à `Ventec-AGV-Monitor`
 2. Ouvrir le service `6e400001-...`
-3. Activer les notifications sur `...0002`, `...0003`, `...0004`
+3. Activer les notifications sur `...0002`, `...0003`, `...0004`, `...0007`, `...0008`, `...0009`
 4. Écrire les seuils sur `...0005` (16 octets, 4 floats)
 5. Lire `...0006` pour l'export CSV
+6. Lire `...000a` pour l'historique alarmes PSRAM
+7. SDK tablette : dossier `ventec-ble-api/` (Kotlin + PROTOCOL.md)
 
 ### Antenne BLE (EXF-20)
 

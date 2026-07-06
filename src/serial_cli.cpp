@@ -8,6 +8,8 @@
 #include "indicators.h"
 #include "lab_test.h"
 #include "power_monitor.h"
+#include "psram_pool.h"
+#include "sensor_monitor.h"
 #include <Arduino.h>
 #include <Wire.h>
 
@@ -52,11 +54,21 @@ static void printHelp() {
     Serial.println("  LABOFF          Desactiver mode laboratoire");
     Serial.println("  SIM <A>         Simuler courant (mode labo)");
     Serial.println("  SIMTEMP <C>     Simuler T° PCB1 (mode labo)");
+    Serial.println("  SIMTEMP2 <C>    Simuler T° PCB2 (mode labo)");
+    Serial.println("  SIMAMB <C>      Simuler T° ambiante (mode labo)");
+    Serial.println("  SIMHUM <pct>    Simuler humidite (mode labo)");
+    Serial.println("  SIMVIB <mg>     Simuler vibration (mode labo)");
+    Serial.println("  SENSORS         Afficher tous les capteurs");
+    Serial.println("  MONITOR ON      Affichage capteurs chaque 1 s");
+    Serial.println("  MONITOR OFF     Arreter affichage continu");
     Serial.println("  THRESH          Afficher seuils alarme");
     Serial.println("  THRESH <w> <a> <t>  Modifier seuils (A, A, °C)");
     Serial.println("  GPIO            Etat broches detection alimentation");
     Serial.println("  STORAGE         Statistiques stockage (Jalon 1)");
+    Serial.println("  PSRAM           Etat memoire IS66WVS1M8BLL");
     Serial.println("  BUZZER          Bip test (GPIO " + String(BUZZER_PIN) + ")");
+    Serial.println("  BUZZER ON       Buzzer continu (2000 Hz)");
+    Serial.println("  BUZZER OFF      Couper le buzzer");
     Serial.println("  BUZZER WARN     Motif sonore avertissement");
     Serial.println("  BUZZER ALARM    Motif sonore alarme critique");
     Serial.println("  BUZZER <Hz> <ms>  Bip personnalise (ex: BUZZER 2500 300)");
@@ -121,7 +133,7 @@ void SerialCli::process(const LiveData& live) {
     i2cScan();
   } else if (cmd == "RAW") {
     float raw = g_current.readRawAmps();
-    Serial.printf("Brut INA219: %.4f A | Apres cal: %.4f A\n",
+    Serial.printf("Brut INA237: %.4f A | Apres cal: %.4f A\n",
                   raw, g_calib.apply(raw));
   } else if (cmd.startsWith("CAL ")) {
     float ref = cmd.substring(4).toFloat();
@@ -143,6 +155,34 @@ void SerialCli::process(const LiveData& live) {
     float a = cmd.substring(4).toFloat();
     g_lab.setSimulatedCurrent(a);
     Serial.printf("Simulation courant: %.2f A\n", a);
+  } else if (cmd.startsWith("SIMTEMP2 ")) {
+    float t = cmd.substring(9).toFloat();
+    g_lab.setSimulatedTempPcb2(t);
+    Serial.printf("Simulation T° PCB2: %.1f C\n", t);
+  } else if (cmd.startsWith("SIMAMB ")) {
+    float t = cmd.substring(7).toFloat();
+    g_lab.setSimulatedTempAmbient(t);
+    Serial.printf("Simulation T° ambiante: %.1f C\n", t);
+  } else if (cmd.startsWith("SIMHUM ")) {
+    float h = cmd.substring(7).toFloat();
+    g_lab.setSimulatedHumidity(h);
+    Serial.printf("Simulation humidite: %.1f %%\n", h);
+  } else if (cmd.startsWith("SIMVIB ")) {
+    float v = cmd.substring(7).toFloat();
+    g_lab.setSimulatedVibrationMg(v);
+    Serial.printf("Simulation vibration: %.0f mg\n", v);
+  } else if (cmd == "SENSORS") {
+    printAllSensors();
+  } else if (cmd == "MONITOR ON") {
+    if (!g_lab.isActive()) {
+      Serial.println("Astuce: tapez LABON pour simuler sans capteurs reels");
+    }
+    setMonitorAuto(true);
+    Serial.println("OK: affichage capteurs toutes les 1 s");
+    printAllSensors();
+  } else if (cmd == "MONITOR OFF") {
+    setMonitorAuto(false);
+    Serial.println("OK: affichage continu arrete");
   } else if (cmd.startsWith("SIMTEMP ")) {
     float t = cmd.substring(8).toFloat();
     g_lab.setSimulatedTempPcb1(t);
@@ -174,11 +214,19 @@ void SerialCli::process(const LiveData& live) {
                   digitalRead(PWR_DETECT_HT_PIN));
   } else if (cmd == "STORAGE") {
     printStorageStats();
+  } else if (cmd == "PSRAM") {
+    g_psram.printStatus();
   } else if (cmd == "VERSION") {
-    Serial.println("Ventec AGV Monitor v1.2");
+    Serial.println("Ventec AGV Monitor v1.3");
   } else if (cmd == "BUZZER") {
     g_indicators.playTone(BUZZER_PWM_FREQ, 500);
     Serial.printf("OK: bip %u Hz, 500 ms (GPIO %d)\n", BUZZER_PWM_FREQ, BUZZER_PIN);
+  } else if (cmd == "BUZZER ON") {
+    g_indicators.startBuzzer(BUZZER_PWM_FREQ);
+    Serial.printf("OK: buzzer ON %u Hz (GPIO %d)\n", BUZZER_PWM_FREQ, BUZZER_PIN);
+  } else if (cmd == "BUZZER OFF") {
+    g_indicators.stopBuzzer();
+    Serial.println("OK: buzzer OFF");
   } else if (cmd == "BUZZER WARN") {
     g_indicators.playPattern(AlarmLevel::WARNING);
     Serial.println("OK: motif warning (2 bips 1500 Hz)");

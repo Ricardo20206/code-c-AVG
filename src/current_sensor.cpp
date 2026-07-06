@@ -1,17 +1,17 @@
 #include "current_sensor.h"
 #include "board_config.h"
 #include "calibration.h"
-#include <Adafruit_INA219.h>
+#include <Adafruit_INA237.h>
 #include <Wire.h>
 
 CurrentSensor g_current;
-static Adafruit_INA219 ina219(INA219_I2C_ADDR);
+static Adafruit_INA237 ina237;
 
 bool CurrentSensor::begin() {
     g_calib.begin();
-    _healthy = ina219.begin();
+    _healthy = ina237.begin(INA237_I2C_ADDR);
     if (_healthy) {
-        ina219.setCalibration_32V_2A();
+        ina237.setShunt(SHUNT_RESISTOR_OHM, MAX_CURRENT_A);
     }
     return _healthy;
 }
@@ -19,9 +19,7 @@ bool CurrentSensor::begin() {
 float CurrentSensor::readRawAmps() {
     if (!_healthy) return 0.0f;
 
-    float mA = ina219.getCurrent_mA();
-    float scale = 0.1f / SHUNT_RESISTOR_OHM;
-    float amps = (mA / 1000.0f) * scale;
+    float amps = ina237.readCurrent();
     if (amps < 0.0f) amps = 0.0f;
     if (amps > MAX_CURRENT_A) amps = MAX_CURRENT_A;
     return amps;
