@@ -32,12 +32,14 @@ pio device monitor
 
 ### Étape 2 — Mesure courant (EXF-07 à EXF-10)
 
+Shunt carte : **ROHM PSR400ITQFF0L50** (0,5 mΩ). Tension attendue ≈ **5 mV à 10 A**.
+
 | # | Action | Commande | Résultat attendu |
 |---|--------|----------|------------------|
-| 5 | Valeur brute | `RAW` | Courant affiché en A |
-| 6 | Appliquer 10A charge | multimètre | Référence = 10,0 A |
+| 5 | Valeur brute | `RAW` | Courant en A + tension shunt (~5 mV @ 10 A) |
+| 6 | Appliquer 10A charge | multimètre | Référence = 10,0 A ; shunt ≈ 5 mV |
 | 7 | Calibrer | `CAL 10.0` | "OK: calibre ref=10.00" |
-| 8 | Vérifier | `STATUS` | Courant ≈ 10,0 A (±0,5 A) |
+| 8 | Vérifier | `STATUS` | Courant ≈ 10,0 A (±0,5 A) ; I=V/R cohérent |
 | 9 | Tester 0A | débrancher charge | Courant < 0,5 A |
 | 10 | Tester 25A | charge max | Alarme critique après 3 s |
 

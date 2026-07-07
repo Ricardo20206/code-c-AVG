@@ -47,7 +47,7 @@ static void printHelp() {
     Serial.println("  EXPORT / LOGS   Export CSV complet (EXF-21)");
     Serial.println("  CLEAR           Effacer les logs");
     Serial.println("  I2CSCAN         Scanner le bus I2C (EXF-31)");
-    Serial.println("  RAW             Valeurs brutes capteur courant");
+    Serial.println("  RAW             Courant brut + tension shunt INA237");
     Serial.println("  CAL <A>         Calibrer avec courant reference (EXF-10)");
     Serial.println("  CALRESET        Reinitialiser calibration");
     Serial.println("  LABON           Activer mode laboratoire");
@@ -117,6 +117,15 @@ void SerialCli::process(const LiveData& live) {
   } else if (cmd == "STATUS") {
     Serial.printf("Courant : %.2f A (cal offset=%.3f gain=%.3f)\n",
                   live.current_a, g_calib.offset(), g_calib.gain());
+    if (g_current.isHealthy()) {
+        const float vshunt_mV = g_current.readShuntVoltage_mV();
+        Serial.printf("Shunt   : %.4f mV (%.1f uV) | I=V/R: %.4f A\n",
+                      vshunt_mV,
+                      vshunt_mV * 1000.0f,
+                      vshunt_mV / 1000.0f / SHUNT_RESISTOR_OHM);
+    } else {
+        Serial.println("Shunt   : INA237 absent");
+    }
     Serial.printf("T° PCB1 : %.1f °C | PCB2 : %.1f °C | Amb : %.1f °C\n",
                   live.temp_pcb1_c, live.temp_pcb2_c, live.temp_ambient_c);
     Serial.printf("Humidite: %.1f %% | Alarme: %d\n",
@@ -135,6 +144,15 @@ void SerialCli::process(const LiveData& live) {
     float raw = g_current.readRawAmps();
     Serial.printf("Brut INA237: %.4f A | Apres cal: %.4f A\n",
                   raw, g_calib.apply(raw));
+    if (g_current.isHealthy()) {
+        const float vshunt_mV = g_current.readShuntVoltage_mV();
+        Serial.printf("Tension shunt: %.4f mV (%.1f uV) | I=V/R: %.4f A\n",
+                      vshunt_mV,
+                      vshunt_mV * 1000.0f,
+                      vshunt_mV / 1000.0f / SHUNT_RESISTOR_OHM);
+    } else {
+        Serial.println("Tension shunt: INA237 absent");
+    }
   } else if (cmd.startsWith("CAL ")) {
     float ref = cmd.substring(4).toFloat();
     float raw = g_current.readRawAmps();

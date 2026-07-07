@@ -1,4 +1,6 @@
 #include "sensor_report.h"
+#include "board_config.h"
+#include "current_sensor.h"
 #include "power_monitor.h"
 #include <Arduino.h>
 
@@ -17,9 +19,19 @@ const char* alarmLevelName(AlarmLevel lvl) {
 void printSensorReport(const LiveData& live, float vibrationMg, bool inaOk, bool tmpOk) {
     const char* alm = alarmLevelName(live.alarm_level);
     const char* src = g_power.sourceName(live.power_source);
+    float vshunt_mV = -1.0f;
+    if (inaOk) {
+        vshunt_mV = g_current.readShuntVoltage_mV();
+    }
 
     Serial.println("--- Capteurs Ventec ---");
     Serial.printf("  Courant batterie : %.2f A\n", live.current_a);
+    if (inaOk) {
+        Serial.printf("  Tension shunt    : %.4f mV (%.1f uV)\n",
+                      vshunt_mV, vshunt_mV * 1000.0f);
+    } else {
+        Serial.println("  Tension shunt    : N/A");
+    }
     Serial.printf("  Temperature PCB1  : %.1f C\n", live.temp_pcb1_c);
     Serial.printf("  Temperature PCB2  : %.1f C\n", live.temp_pcb2_c);
     Serial.printf("  Temperature amb.  : %.1f C\n", live.temp_ambient_c);
@@ -43,9 +55,10 @@ void printSensorReport(const LiveData& live, float vibrationMg, bool inaOk, bool
     Serial.printf("  Mode labo         : %s\n", live.lab_active ? "OUI" : "NON");
 
     Serial.printf(
-        "[SENSORS] I=%.2f T1=%.1f T2=%.1f AMB=%.1f HUM=%.1f VIB=%.0f ALM=%d SRC=%s "
+        "[SENSORS] I=%.2f VSHUNT=%.4f T1=%.1f T2=%.1f AMB=%.1f HUM=%.1f VIB=%.0f ALM=%d SRC=%s "
         "INA=%d TMP=%d VIB_S=%d HUM_S=%d LAB=%d\n",
         live.current_a,
+        vshunt_mV,
         live.temp_pcb1_c,
         live.temp_pcb2_c,
         live.temp_ambient_c,

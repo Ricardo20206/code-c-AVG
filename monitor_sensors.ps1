@@ -36,6 +36,11 @@ function Format-SensorTable([hashtable]$d) {
     else { Write-Host "Mode  : Carte reelle" -ForegroundColor Green }
     Write-Host ""
     Write-Host ("  Courant 36V     : {0,8:N2} A" -f $d.I)
+    if ($d.VSHUNT -ge 0) {
+        Write-Host ("  Tension shunt   : {0,8:N4} mV" -f $d.VSHUNT)
+    } else {
+        Write-Host "  Tension shunt   :      N/A"
+    }
     Write-Host ("  Temperature PCB1: {0,8:N1} C" -f $d.T1)
     Write-Host ("  Temperature PCB2: {0,8:N1} C" -f $d.T2)
     Write-Host ("  Temperature amb.: {0,8:N1} C" -f $d.AMB)
@@ -64,6 +69,7 @@ function Parse-SensorLine([string]$line) {
     }
     return [pscustomobject]@{
         I    = [double]$d.I
+        VSHUNT = if ($d.VSHUNT) { [double]$d.VSHUNT } else { -1.0 }
         T1   = [double]$d.T1
         T2   = [double]$d.T2
         AMB  = [double]$d.AMB

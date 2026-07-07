@@ -11,9 +11,10 @@
 #define I2C_FREQ_HZ         400000
 
 // --- Mesure de courant (shunt + INA237AIDGST sur bus I2C) ---
-// Shunt 2 mΩ AEC-Q200, calibration INA237 → plage 0-30 A
+// Shunt ROHM PSR400ITQFF0L50 : 0.5 mΩ ±1 %, 4 W, AEC-Q200 (10×5.2 mm)
+// Calibration INA237 → plage 0-30 A (15 mV @ 30 A)
 #define INA237_I2C_ADDR     0x40
-#define SHUNT_RESISTOR_OHM  0.002f
+#define SHUNT_RESISTOR_OHM  0.0005f
 #define MAX_CURRENT_A       30.0f
 #define CURRENT_RESOLUTION_A 0.1f
 

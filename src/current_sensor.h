@@ -7,6 +7,8 @@ public:
     bool begin();
     float readCurrentA();
     float readRawAmps();
+    float readShuntVoltageV();
+    float readShuntVoltage_mV();
     bool isHealthy() const { return _healthy; }
 
 private:

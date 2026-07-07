@@ -52,7 +52,7 @@ La carte de monitoring fonctionne en permanence sur le 36 V et permet au technic
 
 | Domaine          | Description                                                         |
 | ---------------- | ------------------------------------------------------------------- |
-| **Courant**      | Mesure continue 0–30 A via shunt 2 mΩ AEC-Q200 + INA237AIDGST             |
+| **Courant**      | Mesure continue 0–30 A via shunt ROHM PSR400ITQFF0L50 (0,5 mΩ) + INA237AIDGST |
 | **Température**  | 2 sondes NTC sur PCB (ADC) + capteur ambiant TMP126DCKR (SPI)           |
 | **Alimentation** | Détection de la source active (USB > BT > HT), log des changements  |
 | **Logging**      | Historique horodaté sur LittleFS avec rotation automatique          |
@@ -76,7 +76,7 @@ La carte de monitoring fonctionne en permanence sur le 36 V et permet au technic
 | MCU             | **ESP32-PICO-D4** (flash 4 Mo intégrée)| Traitement, BLE, Wi-Fi          |
 | PSRAM           | **IS66WVS1M8BLL-104NLI** (1 Mo, quad)  | Tampon alarmes + anneau mesures |
 | Capteur courant | INA237AIDGST @ 0x40                    | Lecture shunt haute courant     |
-| Shunt           | 2 mΩ AEC-Q200                          | Mesure 0–30 A sur batterie 36 V |
+| Shunt           | **PSR400ITQFF0L50** (0,5 mΩ ±1 %, 4 W, AEC-Q200) | Mesure 0–30 A sur batterie 36 V |
 | NTC ×2          | **NB12K00103JBB** (10 kΩ @ 25°C, B25/85 = 3630 K) | Température PCB (GPIO 26, 25) |
 | Capteur ambiant | TMP126DCKR (SPI)                       | Température intérieur châssis   |
 | RTC (optionnel) | DS3231 @ 0x68                          | Horodatage absolu               |
@@ -393,9 +393,9 @@ La variable globale `g_live` est le **tableau de bord instantané** : toutes les
 **Fonctionnement :**
 
 1. Communique avec le chip **INA237AIDGST** sur le bus I2C (adresse 0x40)
-2. L'INA237AIDGST mesure la tension aux bornes du **shunt 2 mΩ** placé en série avec la batterie
-3. Applique une correction de gain car le shunt réel (2 mΩ) diffère du shunt de référence de la bibliothèque (100 mΩ)
-4. Passe la valeur brute dans `g_calib.apply()` pour la calibration
+2. L'INA237AIDGST mesure la tension aux bornes du **shunt PSR400ITQFF0L50 (0,5 mΩ)** placé en série avec la batterie
+3. Configure l'INA237 via `setShunt(0.0005 Ω, 30 A)` pour la conversion tension → courant
+4. Passe la valeur brute dans `g_calib.apply()` pour la calibration terrain
 5. Applique un **lissage exponentiel** (70 % ancienne valeur + 30 % nouvelle) pour filtrer le bruit
 
 **Méthodes exposées :**
@@ -404,9 +404,11 @@ La variable globale `g_live` est le **tableau de bord instantané** : toutes les
 | Méthode          | Description                                                     |
 | ---------------- | --------------------------------------------------------------- |
 | `begin()`        | Initialise l'INA237AIDGST                                             |
-| `readCurrentA()` | Retourne le courant calibré et lissé en ampères                 |
-| `readRawAmps()`  | Retourne la valeur brute avant calibration (pour `CAL` en labo) |
-| `isHealthy()`    | `true` si l'INA237AIDGST répond sur I2C                               |
+| `readCurrentA()`       | Retourne le courant calibré et lissé en ampères                 |
+| `readRawAmps()`        | Retourne la valeur brute avant calibration (pour `CAL` en labo) |
+| `readShuntVoltageV()`  | Tension réelle aux bornes du shunt (V)                          |
+| `readShuntVoltage_mV()`| Même mesure en millivolts                                       |
+| `isHealthy()`          | `true` si l'INA237AIDGST répond sur I2C                        |
 
 
 #### `src/temp_sensors.h` + `src/temp_sensors.cpp`
@@ -708,7 +710,7 @@ Chaque paire `.h` / `.cpp` suit la convention C++ classique : le `.h` déclare l
 | ID        | Priorité    | Description                                      | Module                         |
 | --------- | ----------- | ------------------------------------------------ | ------------------------------ |
 | EXF-07    | OBLIGATOIRE | Mesure courant continue 36 V                     | `current_sensor`               |
-| EXF-08    | OBLIGATOIRE | Composant passif AEC-Q200 (shunt, côté hardware) | `board_config.h`               |
+| EXF-08    | OBLIGATOIRE | Shunt AEC-Q200 PSR400ITQFF0L50 (0,5 mΩ)          | `board_config.h`               |
 | EXF-09    | OBLIGATOIRE | Plage 0–30 A, dérive ≥ 0,5 A                     | `alarm_manager`                |
 | EXF-10    | OBLIGATOIRE | Validation labo (points test, simulation)        | `lab_test`, `calibration`      |
 | EXF-11    | OBLIGATOIRE | 2 sondes NTC PCB                                 | `temp_sensors`                 |
@@ -860,7 +862,7 @@ Toutes les commandes sont envoyées via le moniteur série (115200 baud). Insens
 | Commande           | Description                                             |
 | ------------------ | ------------------------------------------------------- |
 | `HELP`             | Affiche la liste des commandes                          |
-| `STATUS`           | État instantané (courant, températures, alarme, source) |
+| `STATUS`           | État instantané (courant, tension shunt, températures, alarme, source) |
 | `EXPORT` ou `LOGS` | Export CSV complet de l'historique                      |
 | `CLEAR`            | Efface tous les logs                                    |
 | `GPIO`             | État des broches de détection d'alimentation            |
@@ -877,7 +879,7 @@ Toutes les commandes sont envoyées via le moniteur série (115200 baud). Insens
 | Commande                       | Description                                      |
 | ------------------------------ | ------------------------------------------------ |
 | `I2CSCAN`                      | Scan du bus I2C (détecte tous les périphériques) |
-| `RAW`                          | Valeur brute INA237AIDGST avant calibration            |
+| `RAW`                          | Courant brut INA237 + tension shunt (mV / µV) + I=V/R   |
 | `THRESH`                       | Affiche les seuils d'alarme actuels              |
 | `THRESH <warn> <alarm> <temp>` | Modifie les seuils (ex: `THRESH 15 20 75`)       |
 
@@ -894,9 +896,18 @@ Toutes les commandes sont envoyées via le moniteur série (115200 baud). Insens
 **Procédure recommandée :**
 
 1. Appliquer une charge connue (ex. 10 A mesurés à l'ampèremètre)
-2. `RAW` → noter la valeur brute
+2. `RAW` → vérifier courant brut et tension shunt (~5 mV à 10 A pour 0,5 mΩ)
 3. `CAL 10.0` → appliquer la calibration
-4. `STATUS` → vérifier que le courant affiché ≈ 10,0 A (±0,5 A)
+4. `STATUS` → vérifier que le courant affiché ≈ 10,0 A (±0,5 A) et que **I=V/R** est cohérent
+
+**Tensions shunt attendues (PSR400ITQFF0L50, R = 0,5 mΩ) :**
+
+| Courant | Tension shunt |
+| ------- | ------------- |
+| 1 A     | 0,5 mV        |
+| 10 A    | 5 mV          |
+| 20 A    | 10 mV         |
+| 30 A    | 15 mV         |
 
 ### Tests capteurs (INA237, NTC PCB)
 
@@ -904,8 +915,8 @@ Toutes les commandes sont envoyées via le moniteur série (115200 baud). Insens
 
 ```text
 I2CSCAN          # doit afficher 0x40
-RAW              # courant brut (A)
-STATUS           # courant calibré + températures
+RAW              # courant brut + tension shunt (mV)
+STATUS           # courant calibré + shunt + températures
 CAL 10.0         # calibration avec 10 A de référence
 ```
 
@@ -1117,7 +1128,7 @@ Les coefficients `offset` et `gain` sont stockés en **NVS** (namespace `ventec_
   - 3,6 Ω → ~10 A
   - 1,8 Ω → ~20 A
 - Ampèremètre de référence sur les points de test `TP_SHUNT+` / `TP_SHUNT-`
-- Multimètre pour vérifier la tension aux bornes du shunt
+- Multimètre pour vérifier la tension aux bornes du shunt (ex. ~5 mV à 10 A avec PSR400ITQFF0L50)
 
 ### Points de test PCB
 
@@ -1304,7 +1315,7 @@ Vérifications :
 1. `CALRESET` pour réinitialiser
 2. Vérifier l'ampèremètre de référence
 3. Re-calibrer : `CAL <valeur_exacte>`
-4. Vérifier la valeur du shunt dans `board_config.h` (`SHUNT_RESISTOR_OHM`)
+4. Vérifier la valeur du shunt dans `board_config.h` : `SHUNT_RESISTOR_OHM = 0.0005f` (PSR400ITQFF0L50, 0,5 mΩ)
 
 ### Flash échoue (port COM)
 

@@ -7,7 +7,7 @@
 ```
 Batterie 36V (+) ──► Charge AGV ──► Batterie 36V (-)
                          │
-                    [Shunt 2mΩ]
+              [Shunt PSR400ITQFF0L50 0.5mΩ]
                          │
               IN+ (côté batterie +)
               IN- (côté charge)
@@ -19,14 +19,35 @@ Batterie 36V (+) ──► Charge AGV ──► Batterie 36V (-)
 - **IN-** : côté **bas** du shunt (vers la charge AGV / sortie courant)
 - Le courant positif (décharge batterie) produit une tension positive sur IN+ par rapport à IN-
 
+### Composant shunt
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Référence | **ROHM PSR400ITQFF0L50** |
+| Résistance | **0,5 mΩ** (±1 %) |
+| Puissance | 4 W |
+| Norme | AEC-Q200 |
+| Format | 10×5,2 mm (3921) |
+| `SHUNT_RESISTOR_OHM` | `0.0005f` |
+
 ### Plage et précision
 
 | Paramètre | Valeur |
 |-----------|--------|
-| Shunt | 2 mΩ AEC-Q200 |
-| Plage | 0 – 30 A |
-| Résolution | ~0,1 A (après calibration) |
+| Plage courant | 0 – 30 A |
+| Tension shunt @ 30 A | ~15 mV |
+| Résolution INA237 (shunt) | 5 µV (plage normale) |
+| Résolution affichée | ~0,1 A (après calibration) |
 | Détection dérive | 0,5 A (EXF-09) |
+
+**Tensions shunt attendues :**
+
+| Courant | Tension |
+|---------|---------|
+| 1 A | 0,5 mV |
+| 10 A | 5 mV |
+| 20 A | 10 mV |
+| 30 A | 15 mV |
 
 ### Validation laboratoire (EXF-10)
 
@@ -39,11 +60,11 @@ Batterie 36V (+) ──► Charge AGV ──► Batterie 36V (-)
 **Procédure firmware :**
 
 ```
-LABON                  # Activer mode labo
-RAW                    # Lire valeur brute INA237
+LABOFF                 # Capteurs réels
+RAW                    # Courant brut + tension shunt (mV) + I=V/R
 CAL 10.0               # Calibrer avec 10A mesurés au multimètre
-STATUS                 # Vérifier après calibration
-SIM 25.0               # Tester alarme sans AGV
+STATUS                 # Vérifier courant et shunt (~5 mV @ 10 A)
+SIM 25.0               # Tester alarme sans AGV (LABON)
 ```
 
 **Points de test PCB :**

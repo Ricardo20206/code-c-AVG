@@ -25,6 +25,17 @@ float CurrentSensor::readRawAmps() {
     return amps;
 }
 
+float CurrentSensor::readShuntVoltageV() {
+    if (!_healthy) return -1.0f;
+    return ina237.readShuntVoltage();
+}
+
+float CurrentSensor::readShuntVoltage_mV() {
+    float v = readShuntVoltageV();
+    if (v < 0.0f) return v;
+    return v * 1000.0f;
+}
+
 float CurrentSensor::readCurrentA() {
     float raw = readRawAmps();
     float calibrated = g_calib.apply(raw);
