@@ -19,9 +19,10 @@ bool CurrentSensor::begin() {
 float CurrentSensor::readRawAmps() {
     if (!_healthy) return 0.0f;
 
-    float amps = ina237.readCurrent();
-    if (amps < 0.0f) amps = 0.0f;
+    // Adafruit_INA237::readCurrent() retourne des mA (voir Adafruit_INA237.cpp)
+    float amps = ina237.readCurrent() / 1000.0f;
     if (amps > MAX_CURRENT_A) amps = MAX_CURRENT_A;
+    if (amps < -MAX_CURRENT_A) amps = -MAX_CURRENT_A;
     return amps;
 }
 
@@ -32,7 +33,7 @@ float CurrentSensor::readShuntVoltageV() {
 
 float CurrentSensor::readShuntVoltage_mV() {
     float v = readShuntVoltageV();
-    if (v < 0.0f) return v;
+    if (v < -900.0f) return v; // erreur capteur (-1.0f)
     return v * 1000.0f;
 }
 
