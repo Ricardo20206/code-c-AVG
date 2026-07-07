@@ -14,7 +14,7 @@
 
 - Filtrage RC : condensateur 100 nF en parallèle sur l'entrée ADC (EXF-12)
 - Diviseur résistif 10kΩ / NTC 10kΩ @ 25°C
-- Lecture via formule Steinhart-Hart simplifiée (β = 3950)
+- Lecture via formule Steinhart-Hart simplifiée (β = 3630, NB12K00103JBB B25/85)
 
 ### Placement recommandé sur PCB (face TOP)
 

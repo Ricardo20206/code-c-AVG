@@ -77,7 +77,7 @@ La carte de monitoring fonctionne en permanence sur le 36 V et permet au technic
 | PSRAM           | **IS66WVS1M8BLL-104NLI** (1 Mo, quad)  | Tampon alarmes + anneau mesures |
 | Capteur courant | INA237AIDGST @ 0x40                    | Lecture shunt haute courant     |
 | Shunt           | 2 mΩ AEC-Q200                          | Mesure 0–30 A sur batterie 36 V |
-| NTC ×2          | 10 kΩ @ 25°C, β=3950                   | Température PCB (GPIO 26, 25)   |
+| NTC ×2          | **NB12K00103JBB** (10 kΩ @ 25°C, B25/85 = 3630 K) | Température PCB (GPIO 26, 25) |
 | Capteur ambiant | TMP126DCKR (SPI)                       | Température intérieur châssis   |
 | RTC (optionnel) | DS3231 @ 0x68                          | Horodatage absolu               |
 | LEDs            | Verte GPIO **14**, Rouge GPIO **15**   | Signalisation locale            |
@@ -426,7 +426,7 @@ La variable globale `g_live` est le **tableau de bord instantané** : toutes les
 1. Lit la valeur ADC (0–4095 sur 12 bits)
 2. Calcule la tension au point milieu du diviseur
 3. Déduit la résistance de la NTC
-4. Applique l'équation de **Steinhart-Hart** (coefficient β = 3950) pour obtenir °C
+4. Applique l'équation de **Steinhart-Hart** (coefficient β = 3630, B25/85 NB12K00103JBB) pour obtenir °C
 
 **TMP126DCKR ambiant** (SPI : CS=5, MOSI=23, MISO=19, SCLK=18) :
 

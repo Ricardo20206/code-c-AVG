@@ -18,11 +18,13 @@
 #define CURRENT_RESOLUTION_A 0.1f
 
 // --- Sondes NTC PCB (diviseur résistif + filtrage condensateur) ---
+// Référence carte Ventec : KYOCERA AVX NB12K00103JBB (10 kΩ @ 25°C, B25/85 = 3630 K)
+#define NTC_PART_NAME       "NB12K00103JBB"
 #define NTC_PCB1_ADC_PIN    26
 #define NTC_PCB2_ADC_PIN    25
 #define NTC_SERIES_RES_OHM  10000.0f
-#define NTC_BETA            3950.0f
-#define NTC_NOMINAL_OHM     10000.0f
+#define NTC_BETA            3630.0f   // B25/85 (datasheet NB12K, tol. ±3 %)
+#define NTC_NOMINAL_OHM     10000.0f  // R25, tol. ±5 %
 #define NTC_NOMINAL_TEMP_C  25.0f
 
 // --- Température ambiante numérique (SPI, TMP126DCKR) ---
